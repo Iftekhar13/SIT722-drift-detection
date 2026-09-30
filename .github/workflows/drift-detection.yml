@@ -58,3 +58,15 @@ jobs:
         if: steps.drift.outputs.drift == 'true'
         run: |
           echo "WARNING: Configuration drift has been detected."
+
+      - name: Send Discord alert
+        if: steps.drift.outputs.drift == 'true'
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        shell: bash
+        run: |
+          curl -sS \
+            -H "Content-Type: application/json" \
+            -X POST \
+            -d "{\"content\":\"Terraform configuration drift detected.\nThe live Azure infrastructure no longer matches the Terraform configuration.\nRepository: $GITHUB_REPOSITORY\nWorkflow: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID\"}" \
+            "$DISCORD_WEBHOOK_URL"
