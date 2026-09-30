@@ -70,3 +70,46 @@ jobs:
             -X POST \
             -d "{\"content\":\"Terraform configuration drift detected.\nThe live Azure infrastructure no longer matches the Terraform configuration.\nRepository: $GITHUB_REPOSITORY\nWorkflow: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID\"}" \
             "$DISCORD_WEBHOOK_URL"
+
+
+      - name: Automatically remediate drift
+        if: steps.drift.outputs.drift == 'true'
+        run: |
+          echo "Restoring Azure infrastructure to the Terraform configuration..."
+          terraform apply -auto-approve
+
+      - name: Verify remediation
+        if: steps.drift.outputs.drift == 'true'
+        shell: bash
+        run: |
+          set +e
+
+          terraform plan -detailed-exitcode -no-color > verify.txt 2>&1
+          VERIFY_CODE=$?
+
+          cat verify.txt
+
+          if [ "$VERIFY_CODE" -eq 0 ]; then
+            echo "Remediation successful. No configuration drift remains."
+
+          elif [ "$VERIFY_CODE" -eq 2 ]; then
+            echo "Remediation failed. Configuration drift still exists."
+            exit 1
+
+          else
+            echo "Terraform verification encountered an error."
+            exit "$VERIFY_CODE"
+          fi
+
+
+      - name: Send remediation success message
+        if: ${{ success() && steps.drift.outputs.drift == 'true' }}
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        shell: bash
+        run: |
+          curl -sS \
+            -H "Content-Type: application/json" \
+            -X POST \
+            -d "{\"content\":\"Configuration drift was automatically remediated successfully.\nThe Azure infrastructure now matches the Terraform configuration.\nRepository: $GITHUB_REPOSITORY\nWorkflow: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID\"}" \
+            "$DISCORD_WEBHOOK_URL"
