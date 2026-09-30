@@ -113,3 +113,16 @@ jobs:
             -X POST \
             -d "{\"content\":\"Configuration drift was automatically remediated successfully.\nThe Azure infrastructure now matches the Terraform configuration.\nRepository: $GITHUB_REPOSITORY\nWorkflow: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID\"}" \
             "$DISCORD_WEBHOOK_URL"
+
+
+      - name: Send remediation failure message
+        if: ${{ failure() && steps.drift.outputs.drift == 'true' }}
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        shell: bash
+        run: |
+          curl -sS \
+            -H "Content-Type: application/json" \
+            -X POST \
+            -d "{\"content\":\"Automatic drift remediation failed.\nManual investigation is required.\nRepository: $GITHUB_REPOSITORY\nWorkflow: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID\"}" \
+            "$DISCORD_WEBHOOK_URL"
